@@ -105,8 +105,3 @@ Real data integration can be done by:
 
 --------------------------------------------------
 
-AUTHOR
-
-Deepak Meena  
-B.Tech CSE  
-IIIT Delhi
