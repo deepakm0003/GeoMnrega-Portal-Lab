@@ -1,21 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import indiaMicesData from '../data/india_mices.json'
-import indiaMicesDistrictData from '../data/india_mices_districts.json'
+import indiaMicesData from '../data/mices/india_mices.json'
+import indiaMicesDistrictData from '../data/mices/india_mices_districts.json'
 import { getMnregaDataByYear } from '../data/mockData'
 
 // Set your Mapbox access token here
 // Get free token at: https://account.mapbox.com/auth/signin/
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
-export default function MapView({ dataset, year }) {
+export default function MapView({ dataset, year, onStateSelect, selectedState }) {
   const mapContainer = useRef(null)
   const map = useRef(null)
   const [tooltip, setTooltip] = useState(null)
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v12')
   const currentStyleRef = useRef(mapStyle)
   const [styleLoadedTrigger, setStyleLoadedTrigger] = useState(0)
+  const selectedStateIdRef = useRef(null)
 
   useEffect(() => {
     if (map.current) return // Initialize map only once
@@ -31,13 +32,14 @@ export default function MapView({ dataset, year }) {
 
     // Event listeners are bound here once
     
-    // Click to zoom into state
+    // Click to select state
     map.current.on('click', 'states-fill', (e) => {
-       map.current.flyTo({
-          center: e.lngLat,
-          zoom: 6.2,
-          essential: true
-       })
+       const feature = e.features[0];
+       
+       if (onStateSelect) {
+         // Pass both properties and the internal mapbox id so we can highlight it
+         onStateSelect({ ...feature.properties, mapboxId: feature.id });
+       }
     })
         
         let hoveredStateId = null;
@@ -139,8 +141,18 @@ export default function MapView({ dataset, year }) {
         maxzoom: 5.5,
         paint: {
           'line-color': '#000000',
-          'line-width': ['case', ['boolean', ['feature-state', 'hover'], false], 2, 0.5],
-          'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0.3]
+          'line-width': [
+            'case', 
+            ['boolean', ['feature-state', 'selected'], false], 3,
+            ['boolean', ['feature-state', 'hover'], false], 2.5, 
+            0.5
+          ],
+          'line-opacity': [
+            'case', 
+            ['boolean', ['feature-state', 'selected'], false], 1,
+            ['boolean', ['feature-state', 'hover'], false], 1, 
+            0.3
+          ]
         }
       });
     }
@@ -159,7 +171,7 @@ export default function MapView({ dataset, year }) {
     }
 
     const isNicesDataset = dataset === 'nices-cropland' || dataset === 'nices-forest'
-    const isMicesDataset = dataset?.startsWith('mices_')
+    const isVectorDataset = dataset?.startsWith('mices_') || dataset?.startsWith('nrega_')
 
     // Handle NICES Raster Tiles
     if (isNicesDataset) {
@@ -183,8 +195,13 @@ export default function MapView({ dataset, year }) {
       if (map.current.getSource('lulc-tif')) map.current.removeSource('lulc-tif')
     }
 
-    // Handle MICES Vector Choropleth
-    if (isMicesDataset) {
+    // Handle Vector Choropleth (MICES & NREGA)
+    if (isVectorDataset) {
+      let colors = ['#f7fbff', '#c6dbef', '#6baed6', '#2171b5', '#08306b']; // Defaults (Blues)
+      if (dataset?.startsWith('mices_')) colors = ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f']; // Purples
+      else if (dataset?.startsWith('nrega_demand')) colors = ['#fff5eb', '#fdd0a2', '#fd8d3c', '#d94801', '#8c2d04']; // Oranges
+      else if (dataset?.startsWith('nrega_')) colors = ['#f7fcf5', '#c7e9c0', '#74c476', '#238b45', '#00441b']; // Greens
+      
       // Find max state value
       let maxStateVal = 0;
       indiaMicesData.features.forEach(f => {
@@ -215,11 +232,11 @@ export default function MapView({ dataset, year }) {
                   'interpolate',
                   ['exponential', 0.5],
                   ['coalesce', ['get', dataset], 0],
-                  0, '#f2f0f7',
-                  maxStateVal * 0.1, '#cbc9e2',
-                  maxStateVal * 0.25, '#9e9ac8',
-                  maxStateVal * 0.5, '#756bb1',
-                  maxStateVal, '#54278f'
+                  0, colors[0],
+                  maxStateVal * 0.1, colors[1],
+                  maxStateVal * 0.25, colors[2],
+                  maxStateVal * 0.5, colors[3],
+                  maxStateVal, colors[4]
               ],
               'fill-opacity': 0.8,
               'fill-outline-color': 'rgba(0,0,0,0)'
@@ -241,11 +258,11 @@ export default function MapView({ dataset, year }) {
                   'interpolate',
                   ['exponential', 0.5],
                   ['coalesce', ['get', dataset], 0],
-                  0, '#f2f0f7',
-                  maxDistVal * 0.1, '#cbc9e2',
-                  maxDistVal * 0.25, '#9e9ac8',
-                  maxDistVal * 0.5, '#756bb1',
-                  maxDistVal, '#54278f'
+                  0, colors[0],
+                  maxDistVal * 0.1, colors[1],
+                  maxDistVal * 0.25, colors[2],
+                  maxDistVal * 0.5, colors[3],
+                  maxDistVal, colors[4]
               ],
               'fill-opacity': 0.8,
               'fill-outline-color': 'rgba(0,0,0,0)'
@@ -262,6 +279,33 @@ export default function MapView({ dataset, year }) {
        }
     }
   }, [year, dataset, styleLoadedTrigger])
+
+  // Handle selected state styling
+  useEffect(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+    
+    // Ensure source exists before attempting to set feature state
+    if (!map.current.getSource('states')) return;
+
+    // Clear previous
+    if (selectedStateIdRef.current !== null) {
+      map.current.setFeatureState(
+        { source: 'states', id: selectedStateIdRef.current },
+        { selected: false }
+      );
+    }
+    
+    // Set new
+    if (selectedState && selectedState.mapboxId !== undefined) {
+      map.current.setFeatureState(
+        { source: 'states', id: selectedState.mapboxId },
+        { selected: true }
+      );
+      selectedStateIdRef.current = selectedState.mapboxId;
+    } else {
+      selectedStateIdRef.current = null;
+    }
+  }, [selectedState, styleLoadedTrigger])
 
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -360,29 +404,8 @@ export default function MapView({ dataset, year }) {
         </button>
       </div>
 
-      {/* Dataset Info Overlay */}
-      {(dataset === 'nices-cropland' || dataset === 'nices-forest') && (
-        <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur rounded shadow-md border border-gray-200 p-3">
-          <p className="text-sm font-semibold text-gray-800">
-            LULC: {dataset === 'nices-cropland' ? 'Annual Cropland' : 'Forest Class & Cover'}
-          </p>
-          <p className="text-xs text-gray-600 font-medium mt-1">
-            <span className="text-gray-400 mr-2">📅 Year of Mapping:</span>
-            <span className="bg-[#e1f5fe] text-[#007bff] px-2 py-0.5 rounded font-bold">2022</span>
-          </p>
-        </div>
-      )}
-      {dataset?.startsWith('mices_') && (
-        <div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur rounded shadow-md border border-gray-200 p-3 max-w-sm">
-          <p className="text-sm font-semibold text-gray-800">
-            MICES: Water Infrastructure
-          </p>
-          <p className="text-xs text-gray-600 font-medium mt-1">
-            <span className="text-gray-400 mr-2">📅 Edition:</span>
-            <span className="bg-[#e1f5fe] text-[#007bff] px-2 py-0.5 rounded font-bold">5th Census</span>
-          </p>
-        </div>
-      )}
+      {/* Map Controls & Components Below Top Bar */}
+      {/* Dataset Info Overlays Removed as requested */}
 
       {/* Map Container */}
       <div ref={mapContainer} className="w-full h-full" />
@@ -402,9 +425,14 @@ export default function MapView({ dataset, year }) {
             <p className="font-bold text-gray-800 border-b pb-1 mb-1">{tooltip.data.NAME_1}</p>
           ) : null}
           
-          {dataset?.startsWith('mices_') ? (
+          {(dataset?.startsWith('mices_') || dataset?.startsWith('nrega_')) ? (
             <div className="mt-1 text-gray-600">
-               <p><span className="font-medium mr-1">{dataset.replace('mices_', '').replace(/_/g, ' ')}:</span>{tooltip.data[dataset] || 0}</p>
+               <p>
+                 <span className="font-medium mr-1">
+                   {dataset.replace('mices_', '').replace('nrega_', '').replace(/_/g, ' ')}:
+                 </span>
+                 {(tooltip.data[dataset] || 0).toLocaleString()}
+               </p>
             </div>
           ) : tooltip.data.name ? (
             <div className="mt-1 text-gray-600">

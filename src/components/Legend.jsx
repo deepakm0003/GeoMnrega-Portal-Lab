@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import indiaMicesData from '../data/india_mices.json'
+import React from 'react';
+import indiaMicesDistrictData from '../data/mices/india_mices_districts.json';
 
 export default function Legend({ dataset }) {
   if (!dataset) return null;
@@ -8,20 +8,26 @@ export default function Legend({ dataset }) {
   let labels = ['-0.6', '-0.4', '-0.2', '0', '0.2', '0.4', '0.6+']
   let gradientClass = "bg-gradient-to-r from-red-400 via-[#f4ebd0] to-teal-500"
   
-  if (dataset.startsWith('mices_')) {
-     title = dataset.replace('mices_', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + " Count"
+  if (dataset.startsWith('mices_') || dataset.startsWith('nrega_')) {
+     title = dataset.replace('mices_', '').replace('nrega_', '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+     if (dataset.startsWith('mices_')) title += " Count";
      
      let maxVal = 0;
-     indiaMicesData.features.forEach(f => {
+     indiaMicesDistrictData.features.forEach(f => {
        const val = f.properties[dataset];
        if (val && val > maxVal) maxVal = val;
      });
      if (maxVal === 0) maxVal = 100;
      
-     labels = [0, Math.round(maxVal * 0.2), Math.round(maxVal * 0.4), Math.round(maxVal * 0.6), Math.round(maxVal * 0.8), maxVal];
+     labels = [0, Math.round(maxVal * 0.2).toLocaleString(), Math.round(maxVal * 0.4).toLocaleString(), Math.round(maxVal * 0.6).toLocaleString(), Math.round(maxVal * 0.8).toLocaleString(), Math.round(maxVal).toLocaleString()];
      
-     // '#f2f0f7' to '#54278f'
-     gradientClass = "bg-gradient-to-r from-[#f2f0f7] via-[#9e9ac8] to-[#54278f]"
+     if (dataset.startsWith('mices_')) {
+        gradientClass = "bg-gradient-to-r from-[#f2f0f7] via-[#9e9ac8] to-[#54278f]";
+     } else if (dataset.startsWith('nrega_demand')) {
+        gradientClass = "bg-gradient-to-r from-[#fff5eb] via-[#fd8d3c] to-[#8c2d04]";
+     } else if (dataset.startsWith('nrega_')) {
+        gradientClass = "bg-gradient-to-r from-[#f7fcf5] via-[#74c476] to-[#00441b]";
+     }
   } else if (dataset === 'nices-cropland') {
      title = "Annual Cropland Classes"
      labels = ["Kharif", "Double", "Rabi", "Zaid"]

@@ -55,6 +55,16 @@ export default function Sidebar({ dataset, setDataset, year, setYear }) {
       ]
     },
     {
+      id: 'nrega-reports',
+      name: 'NREGA Socio-Economic Reports',
+      variables: [
+        { id: 'nrega_demand', name: 'Total Work Demand' },
+        { id: 'nrega_employment_total', name: 'Total Households Employed' },
+        { id: 'nrega_women_employment', name: 'Women Employed' },
+        { id: 'nrega_persondays_total', name: 'Total Person-Days Generated' }
+      ]
+    },
+    {
       id: 'land-use',
       name: 'Land Use & Environment (NICES)',
       variables: [
@@ -62,6 +72,15 @@ export default function Sidebar({ dataset, setDataset, year, setYear }) {
         { id: 'nices-forest-class', name: 'Forest Class & Cover' },
         { id: 'nices-soil-carbon', name: 'Soil Carbon Content' },
         { id: 'nices-soil-moisture', name: 'Soil Moisture & Depth' }
+      ]
+    },
+    {
+      id: 'lulc-data',
+      name: 'LULC Data (1:250K)',
+      variables: [
+        { id: 'lulc-2005', name: 'LULC 2005-06 Analysis' },
+        { id: 'lulc-2009', name: 'LULC 2009-10 Analysis' },
+        { id: 'lulc-2015', name: 'LULC 2015-16 Analysis' }
       ]
     }
   ];
